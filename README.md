@@ -8,7 +8,7 @@
 - **Supervision** — Optional restart on error or panic with configurable grace period and count
 - **Structured logging** — `slog`-based logger in context (JSON or tint-colored), with service name, version, and namespace
 - **OpenTelemetry** — Traces and metrics via autoexport; service attributes attached to context
-- **Environment config** — Prefixed env vars and `LoadEnv[T]` for typed config from context
+- **Environment config** — Prefixed env vars and `LoadEnv[T]` for typed config from context; env key normalization for POSIX-safe names
 - **Context utilities** — `Name`, `Namespace`, `Version`, `Logger`, `Tracer`, `Meter` from context
 
 ## Installation
@@ -88,7 +88,38 @@ Use `as.DefaultOptions()` or pass `as.Option` funcs into `Run`, `RunC`, or `RunT
 | `LogDebug` | Enable debug-level logging (defaults to true when build has local modifications) |
 | `LogJson` | Use JSON logging |
 | `LogColors` / `LogAutoColors` | Colorized output (auto: when stdout is a TTY) |
-| `EnvPrefix` | Prefix for environment variables (default derived from service name/namespace) |
+| `EnvPrefix` | Prefix for option env vars. If empty, defaults to `<namespace>_<name>_` (namespace omitted if empty); the prefix is normalized via NormalizeEnvKey. Options are then loaded from env (e.g. `PREFIX_RESTART_ON_ERROR`, `PREFIX_GRACE_PERIOD`). |
+
+## Environment variables
+
+Options (restart, logging, shutdown, etc.) are merged with the environment after applying any `Option` funcs. This also means that the values set in environment variables take precedence over the hardcoded values in the `Option` funcs.
+
+The effective prefix is the normalized value of either `EnvPrefix` (if set) or `<namespace>_<name>_` (namespace omitted when empty). Each option is read from a prefixed env var; the following names are used (with the prefix applied):
+
+| Env var | Description |
+|---------|-------------|
+| `RESTART_ON_ERROR` | Restart the service when `RunFunc` returns an error |
+| `RESTART_ON_ERROR_DELAY` | Delay between restarts after an error (e.g. `10s`) |
+| `RESTART_ON_PANIC` | Restart after a recovered panic |
+| `RESTART_ON_PANIC_DELAY` | Delay after a panic (e.g. `5s`); if zero, `RESTART_ON_ERROR_DELAY` is used |
+| `RECOVER_PANIC` | Recover panics in the run loop and treat them as errors |
+| `GRACE_PERIOD` | Max time after first start during which restarts are allowed (e.g. `1m`) |
+| `GRACE_COUNT` | Max number of restarts after the first start |
+| `SHUTDOWN_TIMEOUT` | Max time to wait for shutdown (e.g. `30s`) |
+| `LOG_DEBUG` | Enable debug-level logging |
+| `LOG_JSON` | Use JSON logging |
+| `LOG_COLORS` | Force colorized output |
+| `LOG_COLORS_AUTO` | Colorize when stdout is a TTY |
+
+### Environment key normalization
+
+Option prefixes and environment variable keys used with `GetEnv` / `LookupEnv` are normalized via `NormalizeEnvKey` so that names are POSIX-safe and consistent. Normalization:
+
+- Decomposes accented Unicode (e.g. "é" → "e"); combining marks are removed
+- Converts letters to uppercase
+- Replaces non-alphanumeric characters with a single underscore and trims leading/trailing underscores
+
+Resulting keys use only `[A-Z0-9_]`. Example: `"my-Énv.key"` → `"MY_ENV_KEY"`. The option prefix (from `EnvPrefix` or `<namespace>_<name>_`) is normalized before reading options from the environment. `as.GetEnv(ctx, key)` and `as.LookupEnv(ctx, key)` apply the same normalization to the key used for lookup. `as.LoadEnv[T](ctx)` uses the (normalized) prefix from context.
 
 ## Context utilities
 
@@ -96,7 +127,7 @@ The context passed to `InitFunc` is augmented by init (e.g. OpenTelemetry); `Run
 
 - **Identity** — `as.Name(ctx)`, `as.Namespace(ctx)`, `as.Version(ctx)`
 - **Logging** — `as.Logger(ctx)` returns an `*slog.Logger` with service metadata
-- **Environment** — `as.GetEnv(ctx, key)`, `as.LookupEnv(ctx, key)`, `as.LoadEnv[T](ctx)` using the configured `EnvPrefix`
+- **Environment** — Options are filled from prefixed env vars (prefix from `EnvPrefix` or default `<namespace>_<name>_`, normalized). Context helpers: `as.GetEnv(ctx, key)`, `as.LookupEnv(ctx, key)`, `as.LoadEnv[T](ctx)` when the prefix is set via `as.WithEnvPrefix(ctx, prefix)`.
 - **OpenTelemetry** — `as.Tracer(ctx)`, `as.Meter(ctx)` for tracing and metrics
 
 ## Running the service

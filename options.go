@@ -3,51 +3,59 @@ package as
 import (
 	"runtime/debug"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
 // Options defines the configuration parameters for the lifecycle and supervision
 // of a service instance. These control restart policies, shutdown handling,
 // and debug logging. All time-based fields are expressed as time.Duration.
 //
+// After applying Option funcs, options are merged with environment variables:
+// the effective env prefix (see EnvPrefix) is normalized and used with
+// env.ParseWithOptions, so any option may be overridden by a matching env var
+// (e.g. PREFIX_RESTART_ON_ERROR, PREFIX_GRACE_PERIOD).
+//
 // The zero value of Options is not valid: use DefaultOptions or applyOptions to obtain sensible defaults.
 type Options struct {
 	// RestartOnError enables automatic service restarts upon encountering an error.
 	// The number of allowed restarts is governed by GraceCount and GracePeriod, whichever is reached first.
-	RestartOnError bool
+	RestartOnError bool `env:"RESTART_ON_ERROR"`
 	// RestartOnErrorDelay specifies the delay between consecutive restarts due to errors.
-	RestartOnErrorDelay time.Duration
+	RestartOnErrorDelay time.Duration `env:"RESTART_ON_ERROR_DELAY"`
 	// RestartOnPanic enables automatic restarts when the service panics.
-	RestartOnPanic bool
+	RestartOnPanic bool `env:"RESTART_ON_PANIC"`
 	// RestartOnPanicDelay is the delay between restarts caused by a panic.
 	// If unset (zero), RestartOnErrorDelay is used.
-	RestartOnPanicDelay time.Duration
+	RestartOnPanicDelay time.Duration `env:"RESTART_ON_PANIC_DELAY"`
 	// RecoverPanic enables automatic recovery from panics in the service main loop.
 	// If true, panics will be converted and handled as normal service errors.
-	RecoverPanic bool
+	RecoverPanic bool `env:"RECOVER_PANIC"`
 	// GracePeriod is the maximum duration after the initial start during which retries are allowed.
 	// If set to zero, there is no time limit.
-	GracePeriod time.Duration
+	GracePeriod time.Duration `env:"GRACE_PERIOD"`
 	// GraceCount is the total number of allowed restarts after the first start.
 	// If set to zero, there is no limit.
-	GraceCount int
+	GraceCount int `env:"GRACE_COUNT"`
 	// ShutdownTimeout is the maximum duration to wait when shutting down the service gracefully.
 	// If the service shutdown takes longer than this, it will be forcefully terminated. Any restart config
 	// will be ignored.
-	ShutdownTimeout time.Duration
+	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT"`
 	// LogDebug enables verbose debug logging for this service.
 	// Defaults to true when the source tree has local modifications.
 	// Implicitly disables JSON logging when enabled.
-	LogDebug bool
+	LogDebug bool `env:"LOG_DEBUG"`
 	// LogJson enables JSON-formatted logging output.
-	LogJson bool
+	LogJson bool `env:"LOG_JSON"`
 	// LogColors enables colorized logging output. Ignored if LogJson is true.
-	LogColors bool
+	LogColors bool `env:"LOG_COLORS"`
 	// LogAutoColors enables colorized logging output if stdout is a terminal.
-	LogAutoColors bool
-	// EnvPrefix is the prefix to use for environment variables.
-	// If empty, defaults <SERVICE>_ where service is the upper case name of the service name.
-	// If Namespace is set, the prefix will default to <NAMESPACE>_<SERVICE>_
-	// If the service name contains non-alphanumeric characters, they will be replaced with underscores.
+	LogAutoColors bool `env:"LOG_COLORS_AUTO"`
+	// EnvPrefix is the prefix used when loading Options from the environment.
+	// If empty, the prefix is derived from the service namespace and name:
+	// "<namespace>_<name>_" when namespace is set, otherwise "<name>_".
+	// The final prefix is normalized with NormalizeEnvKey before use.
+	// Option fields are then filled from env vars like PREFIX_RESTART_ON_ERROR, PREFIX_GRACE_PERIOD, etc.
 	EnvPrefix string
 }
 
@@ -130,13 +138,28 @@ func WithLogAutoColors(v bool) Option {
 	return func(o *Options) { o.LogAutoColors = v }
 }
 
-// applyOptions applies a sequence of Option functions to a new Options struct initialized
-// with DefaultOptions, yielding a complete Options configuration for service use.
-func applyOptions(opts []Option) Options {
+// applyOptions builds Options by applying the given Option funcs to DefaultOptions(),
+// then overlaying environment variables. The env prefix is: EnvPrefix if non-empty;
+// otherwise "<namespace>_<name>_" (namespace omitted if empty). The prefix is
+// normalized with NormalizeEnvKey and passed to env.ParseWithOptions so that
+// Options fields (e.g. RESTART_ON_ERROR, GRACE_PERIOD) can be set via prefixed env vars.
+func applyOptions(name, namespace string, opts []Option) Options {
 	o := DefaultOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
+
+	envPrefix := o.EnvPrefix
+	if envPrefix == "" {
+		if namespace != "" {
+			envPrefix = namespace + "_"
+		}
+		envPrefix = envPrefix + name + "_"
+	}
+
+	_ = env.ParseWithOptions(&o, env.Options{
+		Prefix: NormalizeEnvKey(envPrefix),
+	})
 
 	return o
 }

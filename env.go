@@ -3,8 +3,11 @@ package as
 import (
 	"context"
 	"os"
+	"strings"
+	"unicode"
 
 	"github.com/caarlos0/env/v11"
+	"golang.org/x/text/unicode/norm"
 )
 
 // envPrefixKey is an unexported type used as a key for storing the environment prefix in a context.
@@ -48,8 +51,40 @@ func LoadEnv[T any](ctx context.Context) (T, error) {
 	})
 }
 
-// normalizeEnvName processes the environment variable value before returning it from GetEnv or LookupEnv.
-// This function currently returns the value unchanged, but can be extended for normalization logic.
+// NormalizeEnvKey normalizes a string for use as an environment variable key.
+// It performs the following steps:
+//   - Decomposes accented Unicode characters (e.g., "é" becomes "e" + acute); combining marks are removed.
+//   - Converts all letters to uppercase.
+//   - Replaces any non-alphanumeric character with a single underscore.
+//   - Collapses consecutive non-alphanumeric characters into a single underscore.
+//   - Trims leading and trailing underscores.
+//
+// The resulting keys are POSIX-safe, consisting only of [A-Z0-9_] and fully uppercase.
+// Example: "my-Énv.key" → "MY_ENV_KEY"
 func NormalizeEnvKey(name string) string {
-	return name
+	// NFD decomposes e.g. é into e + combining acute; we drop combining marks below.
+	name = norm.NFD.String(name)
+
+	var out []rune
+	for _, r := range name {
+		// skip combining marks (accents)
+		if unicode.In(r, unicode.Mn) {
+			continue
+		}
+
+		// Convert to upper case, or underscore if not alphanumeric
+		if (r >= 'A' && r <= 'Z') ||
+			(r >= 'a' && r <= 'z') ||
+			(r >= '0' && r <= '9') {
+			out = append(out, unicode.ToUpper(r))
+		} else {
+			if len(out) > 0 && out[len(out)-1] == '_' {
+				continue
+			}
+			out = append(out, '_')
+		}
+	}
+
+	// Trim any leading or trailing underscores
+	return strings.Trim(string(out), "_")
 }

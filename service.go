@@ -74,7 +74,7 @@ func (s *Service) RunToCompletionC(ctx context.Context, opts ...Option) {
 func (s *Service) RunC(ctx context.Context, opts ...Option) error {
 	s.validate()
 
-	return s.runLoop(ctx, applyOptions(opts))
+	return s.runLoop(ctx, applyOptions(s.Name, s.Namespace, opts))
 }
 
 func (s *Service) validate() {
