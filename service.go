@@ -23,6 +23,7 @@ type Service struct {
 	// tracing, and configuration. E.g. "monitoring", "billing", etc.
 	Namespace string
 	// Version is a semantic version tag for the service.
+	// Should be either SemVer or CalVer
 	Version string
 	// InitFunc is called once before starting RunFunc. It is used for setup and
 	// validation. If it returns an error, RunFunc is not invoked.
@@ -61,7 +62,7 @@ func (s *Service) RunToCompletionC(ctx context.Context, opts ...Option) {
 	if err := s.RunC(ctx, opts...); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			ae.Print(err, ae.PrintFrameFilters(func(frame *ae.StackFrame) bool {
-				return strings.HasPrefix(frame.Func, "git.m3connect.de/ategtmeier/flowseer/common/backend/service.(*Service)")
+				return strings.HasPrefix(frame.Func, "go.aledante.io/as.(*Service)")
 			}))
 		}
 
@@ -100,9 +101,10 @@ func (s *Service) runLoop(ctx context.Context, opts Options) error {
 	ctx = withName(ctx, s.Name)
 	ctx = withVersion(ctx, s.Version)
 	ctx = withNamespace(ctx, s.Namespace)
+	ctx = withEnvPrefix(ctx, opts.EnvPrefix)
 
 	// Create initial logger
-	ctx = withLogger(ctx, initLogger(ctx, opts))
+	ctx = WithLogger(ctx, initLogger(ctx, opts))
 
 	if s.running.Swap(true) {
 		return ae.MsgC(ctx, "already running")

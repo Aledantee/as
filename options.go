@@ -1,7 +1,6 @@
 package as
 
 import (
-	"runtime/debug"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -47,7 +46,7 @@ type Options struct {
 	LogDebug bool `env:"LOG_DEBUG"`
 	// LogJson enables JSON-formatted logging output.
 	LogJson bool `env:"LOG_JSON"`
-	// LogColors enables colorized logging output. Ignored if LogJson is true.
+	// LogColors enables colorized logging output. Does nothing when using JSON logging.
 	LogColors bool `env:"LOG_COLORS"`
 	// LogAutoColors enables colorized logging output if stdout is a terminal.
 	LogAutoColors bool `env:"LOG_COLORS_AUTO"`
@@ -57,21 +56,18 @@ type Options struct {
 	// The final prefix is normalized with NormalizeEnvKey before use.
 	// Option fields are then filled from env vars like PREFIX_RESTART_ON_ERROR, PREFIX_GRACE_PERIOD, etc.
 	EnvPrefix string
+	// DisableEnvPrefix, when set to true, prevents any environment variable prefix
+	// from being applied when loading option values from the environment, regardless of EnvPrefix.
+	// This can be used to disable all prefixing behavior for built-in options,
+	// ensuring that option fields are matched exactly to their environment variable names
+	// as defined by the `env` struct tags.
+	// As with all env options, this will also impact the EnvPrefix behavior for the service context.
+	DisableEnvPrefix bool
 }
 
 // DefaultOptions returns an Options struct pre-populated with recommended default values
 // for robust service supervision. Callers may further modify the returned struct.
 func DefaultOptions() Options {
-	bi, ok := debug.ReadBuildInfo()
-	logDebug := false
-	if ok {
-		for _, s := range bi.Settings {
-			if s.Key == "vcs.modified" {
-				logDebug = true
-			}
-		}
-	}
-
 	return Options{
 		RestartOnError:      true,
 		RestartOnErrorDelay: 10 * time.Second,
@@ -80,9 +76,12 @@ func DefaultOptions() Options {
 		GracePeriod:         1 * time.Minute,
 		GraceCount:          3,
 		ShutdownTimeout:     30 * time.Second,
-		LogDebug:            logDebug,
+		LogDebug:            false,
+		LogColors:           false,
 		LogAutoColors:       true,
 		LogJson:             true,
+		EnvPrefix:           "",
+		DisableEnvPrefix:    false,
 	}
 }
 
@@ -90,52 +89,69 @@ func DefaultOptions() Options {
 // Use higher-level constructors or WithXyz style helpers to supply these.
 type Option func(*Options)
 
+// WithRestartOnError sets the RestartOnError field, enabling or disabling automatic service restarts on error.
 func WithRestartOnError(v bool) Option {
 	return func(o *Options) { o.RestartOnError = v }
 }
 
+// WithRestartOnErrorDelay sets the delay between consecutive restarts due to errors.
 func WithRestartOnErrorDelay(v time.Duration) Option {
 	return func(o *Options) { o.RestartOnErrorDelay = v }
 }
 
+// WithRestartOnPanic sets the RestartOnPanic field, enabling or disabling restarts when the service panics.
 func WithRestartOnPanic(v bool) Option {
 	return func(o *Options) { o.RestartOnPanic = v }
 }
 
+// WithRestartOnPanicDelay sets the delay between restarts triggered by a panic.
 func WithRestartOnPanicDelay(v time.Duration) Option {
 	return func(o *Options) { o.RestartOnPanicDelay = v }
 }
 
+// WithRecoverPanic sets the RecoverPanic field, enabling or disabling panic recovery.
 func WithRecoverPanic(v bool) Option {
 	return func(o *Options) { o.RecoverPanic = v }
 }
 
+// WithGracePeriod sets the maximum duration after the initial start in which restarts are allowed.
 func WithGracePeriod(v time.Duration) Option {
 	return func(o *Options) { o.GracePeriod = v }
 }
 
+// WithGraceCount sets the maximum number of allowed restarts after the initial start.
 func WithGraceCount(v int) Option {
 	return func(o *Options) { o.GraceCount = v }
 }
 
+// WithShutdownTimeout sets the maximum time to wait for graceful service shutdown.
 func WithShutdownTimeout(v time.Duration) Option {
 	return func(o *Options) { o.ShutdownTimeout = v }
 }
 
+// WithLogDebug sets the LogDebug field, enabling or disabling verbose debug logging.
 func WithLogDebug(v bool) Option {
 	return func(o *Options) { o.LogDebug = v }
 }
 
+// WithLogJson sets the LogJson field, enabling or disabling JSON-formatted logging output.
 func WithLogJson(v bool) Option {
 	return func(o *Options) { o.LogJson = v }
 }
 
+// WithLogColors sets the LogColors field, enabling or disabling colorized logging output.
 func WithLogColors(v bool) Option {
 	return func(o *Options) { o.LogColors = v }
 }
 
+// WithLogAutoColors sets the LogAutoColors field, enabling or disabling automatic colorization if stdout is a terminal.
 func WithLogAutoColors(v bool) Option {
 	return func(o *Options) { o.LogAutoColors = v }
+}
+
+// WithDisableEnvPrefix sets the DisableEnvPrefix field, preventing any environment variable prefix from being applied.
+func WithDisableEnvPrefix(v bool) Option {
+	return func(o *Options) { o.DisableEnvPrefix = v }
 }
 
 // applyOptions builds Options by applying the given Option funcs to DefaultOptions(),
@@ -149,16 +165,23 @@ func applyOptions(name, namespace string, opts []Option) Options {
 		opt(&o)
 	}
 
-	envPrefix := o.EnvPrefix
-	if envPrefix == "" {
-		if namespace != "" {
-			envPrefix = namespace + "_"
+	envPrefix := ""
+	if !o.DisableEnvPrefix {
+		envPrefix = o.EnvPrefix
+		if envPrefix == "" {
+			if namespace != "" {
+				envPrefix = namespace + "_"
+			}
+			envPrefix = envPrefix + name + "_"
 		}
-		envPrefix = envPrefix + name + "_"
+	}
+
+	if envPrefix != "" {
+		envPrefix = NormalizeEnvKey(envPrefix) + "_"
 	}
 
 	_ = env.ParseWithOptions(&o, env.Options{
-		Prefix: NormalizeEnvKey(envPrefix),
+		Prefix: envPrefix,
 	})
 
 	return o

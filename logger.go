@@ -12,12 +12,18 @@ import (
 // loggerKey is the key used to store the logger in the context.
 type loggerKey struct{}
 
-// withLogger adds a logger to the context.
-func withLogger(ctx context.Context, logger *slog.Logger) context.Context {
+// WithLogger returns a new context.Context that associates the provided logger with ctx.
+// If logger is nil and no logger is already set in the context, slog.Default() is used.
+// If logger is nil and a logger is already set, the context is left unchanged.
+// Use Logger(ctx) to retrieve the logger later. This is intended for attaching a contextual logger to a request or service context.
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
 	if logger == nil {
-		logger = slog.Default()
+		_, ok := ctx.Value(loggerKey{}).(*slog.Logger)
+		if ok {
+			return ctx
+		}
+		return context.WithValue(ctx, loggerKey{}, slog.Default())
 	}
-
 	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
@@ -46,7 +52,7 @@ func initLogger(ctx context.Context, opts Options) *slog.Logger {
 	}
 
 	var handler slog.Handler
-	if opts.LogJson && !opts.LogDebug {
+	if opts.LogJson {
 		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: level,
 		})

@@ -14,7 +14,7 @@ import (
 type envPrefixKey struct{}
 
 // WithEnvPrefix returns a new context.Context derived from ctx that contains the given environment variable prefix.
-func WithEnvPrefix(ctx context.Context, prefix string) context.Context {
+func withEnvPrefix(ctx context.Context, prefix string) context.Context {
 	return context.WithValue(ctx, envPrefixKey{}, prefix)
 }
 
