@@ -51,7 +51,7 @@ type Service struct {
 // Blocks until the service exits. Returns any error encountered during execution
 // or initialization. Convenience wrapper for RunC.
 func (s *Service) Run(opts ...Option) error {
-	return s.RunC(context.Background())
+	return s.RunC(context.Background(), opts...)
 }
 
 // RunToCompletion starts the service in a background context and forcibly

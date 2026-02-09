@@ -1,6 +1,6 @@
 # as
 
-**as** is a Go library for building long-running, supervised services. It provides a single `Service` type with configurable init/run/shutdown lifecycle, automatic restart policies, structured logging, OpenTelemetry integration, and context-based configuration.
+**as** is a Go library for building long-running, supervised services. It provides a single `Service` type with configurable init/run/shutdown lifecycle, automatic restart policies, structured logging, OpenTelemetry integration, and context-based configuration. 
 
 ## Features
 
@@ -63,7 +63,7 @@ func main() {
 
 ## Service lifecycle
 
-1. **Validate** — `Name` and `Version` must be set (panic otherwise).
+1. **Validate** — `Name` must be set (panic otherwise). `Version` must be set or auto-filled: when `VCSVersion` is true, `Version` is set from build info (`vcs.revision`) if available; otherwise `Version` is required (panic if empty).
 2. **Loop** — On each iteration (including after a restart), the service runs:
    - **Init** — OpenTelemetry is initialized, then `InitFunc` is run if set. On error, the iteration fails (and may trigger a restart if configured).
    - **Run** — `RunFunc` is executed. It should block until the context is canceled or an error occurs.
@@ -73,7 +73,7 @@ When restart is enabled, the **entire** cycle (init → run → shutdown) is rep
 
 ## Options
 
-Use `as.DefaultOptions()` or pass `as.Option` funcs into `Run`, `RunC`, or `RunToCompletionC`:
+Use `as.DefaultOptions()` or pass `as.Option` funcs into `Run`, `RunC`, `RunToCompletion`, or `RunToCompletionC`:
 
 | Option | Description |
 |--------|-------------|
@@ -85,10 +85,11 @@ Use `as.DefaultOptions()` or pass `as.Option` funcs into `Run`, `RunC`, or `RunT
 | `GracePeriod` | Max time after first start during which restarts are allowed |
 | `GraceCount` | Max number of restarts after the first start |
 | `ShutdownTimeout` | Max time to wait for shutdown |
-| `LogDebug` | Enable debug-level logging (defaults to true when build has local modifications) |
+| `LogDebug` | Enable debug-level logging |
 | `LogJson` | Use JSON logging |
 | `LogColors` / `LogAutoColors` | Colorized output (auto: when stdout is a TTY) |
 | `EnvPrefix` | Prefix for option env vars. If empty, defaults to `<namespace>_<name>_` (namespace omitted if empty); the prefix is normalized via NormalizeEnvKey. Options are then loaded from env (e.g. `PREFIX_RESTART_ON_ERROR`, `PREFIX_GRACE_PERIOD`). |
+| `DisableEnvPrefix` | When true, no env prefix is applied when loading options (or for context env helpers); option env names are used as-is. |
 
 ## Environment variables
 
