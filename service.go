@@ -3,6 +3,7 @@ package as
 import (
 	"context"
 	"errors"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -22,9 +23,14 @@ type Service struct {
 	// Namespace is a logical grouping for the service, useful for organizing monitoring,
 	// tracing, and configuration. E.g. "monitoring", "billing", etc.
 	Namespace string
-	// Version is a semantic version tag for the service.
-	// Should be either SemVer or CalVer
+	// Version specifies the semantic version of the service.
+	// If empty and VCSVersion is true, the version is automatically set from build info using vcs.revision.
+	// If empty and VCSVersion is false, the service will panic during startup.
 	Version string
+	// VCSVersion controls automatic versioning based on VCS revision.
+	// When true, Version will be set from build info using vcs.revision, falling back to the Version field if unavailable.
+	// When false, Version must be set explicitly by the user.
+	VCSVersion bool
 	// InitFunc is called once before starting RunFunc. It is used for setup and
 	// validation. If it returns an error, RunFunc is not invoked.
 	// This is optional (may be nil).
@@ -80,10 +86,20 @@ func (s *Service) RunC(ctx context.Context, opts ...Option) error {
 
 func (s *Service) validate() {
 	if s.Name == "" {
-		panic("service name must be set")
+		ae.PrintExit(errors.New("service name is required"))
 	}
+
+	if s.VCSVersion {
+		bi, _ := debug.ReadBuildInfo()
+		for _, setting := range bi.Settings {
+			if setting.Key == "vcs.revision" && setting.Value != "" {
+				s.Version = setting.Value
+			}
+		}
+	}
+
 	if s.Version == "" {
-		panic("service version must be set")
+		ae.PrintExit(errors.New("service version is required"))
 	}
 }
 
