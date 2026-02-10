@@ -8,6 +8,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	go.aledante.io/ae v0.1.5
 	go.opentelemetry.io/contrib/exporters/autoexport v0.65.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.65.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/metric v1.40.0
 	go.opentelemetry.io/otel/sdk v1.40.0

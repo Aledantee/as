@@ -6,6 +6,7 @@ import (
 
 	"go.aledante.io/ae"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel/metric"
 	metricNoop "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
@@ -172,9 +173,9 @@ func initOtel(ctx context.Context) (context.Context, func(context.Context) error
 	spanExporter, err := autoexport.NewSpanExporter(ctx, autoexport.WithFallbackSpanExporter(noopSpanExporterFunc))
 	if err != nil {
 		return ctx, noopShutdown, ae.Wrap("failed to create OTEL span exporter", err)
-	} else {
-		shutdownFuncs = append(shutdownFuncs, spanExporter.Shutdown)
 	}
+
+	shutdownFuncs = append(shutdownFuncs, spanExporter.Shutdown)
 	if isNoopSpanExporter(spanExporter) {
 		Logger(ctx).Warn("using a no-op OTEL span exporter. Set OTEL_TRACES_EXPORTER and related env vars as required")
 	}
@@ -186,12 +187,15 @@ func initOtel(ctx context.Context) (context.Context, func(context.Context) error
 	ctx = withTracerProvider(ctx, tracerProvider)
 	ctx = withTracer(ctx, tracerProvider.Tracer(tracerName))
 
-	metricReader, err := autoexport.NewMetricReader(ctx, autoexport.WithFallbackMetricReader(noopMetricReaderFunc))
+	metricReader, err := autoexport.NewMetricReader(ctx,
+		autoexport.WithFallbackMetricReader(noopMetricReaderFunc),
+	)
 	if err != nil {
 		return ctx, noopShutdown, ae.Wrap("failed to create OTEL metric reader", err)
-	} else {
-		shutdownFuncs = append(shutdownFuncs, metricReader.Shutdown)
 	}
+
+	shutdownFuncs = append(shutdownFuncs, metricReader.Shutdown)
+
 	if isNoopMetricReader(metricReader) {
 		Logger(ctx).Warn("using a no-op OTEL metric exporter. Set OTEL_METRICS_EXPORTER and related env vars as required")
 	}
@@ -202,6 +206,12 @@ func initOtel(ctx context.Context) (context.Context, func(context.Context) error
 	)
 	ctx = withMeterProvider(ctx, meterProvider)
 	ctx = withMeter(ctx, meterProvider.Meter(meterName))
+
+	// We will be missing go.schedule.duration, but that is only exposed by runtime.NewProducer which we cannot add
+	// to the autoexport reader... but it does not seem to be of much use
+	_ = runtime.Start(
+		runtime.WithMeterProvider(meterProvider),
+	)
 
 	return ctx, shutdown, nil
 }
