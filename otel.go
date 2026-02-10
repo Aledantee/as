@@ -3,6 +3,7 @@ package as
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"go.aledante.io/ae"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
@@ -177,7 +178,12 @@ func initOtel(ctx context.Context) (context.Context, func(context.Context) error
 
 	shutdownFuncs = append(shutdownFuncs, spanExporter.Shutdown)
 	if isNoopSpanExporter(spanExporter) {
-		Logger(ctx).Warn("using a no-op OTEL span exporter. Set OTEL_TRACES_EXPORTER and related env vars as required")
+		Logger(ctx).Warn(
+			fmt.Sprintf(
+				"using a no-op OTEL span exporter. Set %s and related env vars as required",
+				EnvKey(ctx, "OTEL_EXPORTER_OTLP_ENDPOINT"),
+			),
+		)
 	}
 
 	tracerProvider := traceSdk.NewTracerProvider(
@@ -197,7 +203,12 @@ func initOtel(ctx context.Context) (context.Context, func(context.Context) error
 	shutdownFuncs = append(shutdownFuncs, metricReader.Shutdown)
 
 	if isNoopMetricReader(metricReader) {
-		Logger(ctx).Warn("using a no-op OTEL metric exporter. Set OTEL_METRICS_EXPORTER and related env vars as required")
+		Logger(ctx).Warn(
+			fmt.Sprintf(
+				"using a no-op OTEL metric exporter. Set %s and related env vars as required",
+				EnvKey(ctx, "OTEL_METRICS_EXPORTER"),
+			),
+		)
 	}
 
 	meterProvider := metricSdk.NewMeterProvider(

@@ -28,16 +28,21 @@ func EnvPrefix(ctx context.Context) string {
 	return v
 }
 
+// EnvKey returns the normalized environment variable key for the given key, with any prefix set in the context applied.
+func EnvKey(ctx context.Context, key string) string {
+	return NormalizeEnvKey(EnvPrefix(ctx) + key)
+}
+
 // GetEnv retrieves the value of the environment variable named by the key, with any prefix set in the context applied.
 // The key is normalized using NormalizeEnvKey before being used to retrieve the value from the environment.
 func GetEnv(ctx context.Context, key string) string {
-	return os.Getenv(NormalizeEnvKey(EnvPrefix(ctx) + key))
+	return os.Getenv(EnvKey(ctx, key))
 }
 
 // LookupEnv retrieves the value of the environment variable named by the key, with any prefix in the context applied.
 // The key is normalized using NormalizeEnvKey before lookup. It returns the value and a boolean indicating whether the variable was present.
 func LookupEnv(ctx context.Context, key string) (string, bool) {
-	v, ok := os.LookupEnv(NormalizeEnvKey(EnvPrefix(ctx) + key))
+	v, ok := os.LookupEnv(EnvKey(ctx, key))
 	return v, ok
 }
 
