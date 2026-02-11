@@ -177,11 +177,11 @@ func applyOptions(name, namespace string, opts []Option) Options {
 	}
 
 	if envPrefix != "" {
-		envPrefix = NormalizeEnvKey(envPrefix) + "_"
+		o.EnvPrefix = NormalizeEnvKey(envPrefix) + "_"
 	}
 
 	_ = env.ParseWithOptions(&o, env.Options{
-		Prefix: envPrefix,
+		Prefix: o.EnvPrefix,
 	})
 
 	return o
