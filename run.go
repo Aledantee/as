@@ -8,49 +8,27 @@ import (
 
 	"go.aledante.io/ae"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
-	"golang.org/x/sync/errgroup"
 )
 
 // Run starts the service in a new background context with the given options.
 // Blocks until the service exits. Returns any error encountered during execution
 // or initialization. Convenience wrapper for RunC.
 func Run(svc Service, opts ...Option) error {
-	return RunGroupC([]Service{svc}, context.Background(), opts...)
-}
-
-// RunGroup starts the service in a new background context with the given options.
-// Blocks until the service exits. Returns any error encountered during execution
-// or initialization. Convenience wrapper for RunC.
-func RunGroup(svcs []Service, opts ...Option) error {
-	return RunGroupC(svcs, context.Background(), opts...)
+	return RunC(svc, context.Background(), opts...)
 }
 
 // RunAndExit starts the service in a background context and forcibly
 // exits the process if the service exits with an error other than context.Canceled.
 // Intended for main-functions. Errors are reported, then ae.Exit is called.
 func RunAndExit(svc Service, opts ...Option) {
-	RunGroupAndExitC([]Service{svc}, context.Background(), opts...)
-}
-
-// RunGroupAndExit starts the service in a background context and forcibly
-// exits the process if the service exits with an error other than context.Canceled.
-// Intended for main-functions. Errors are reported, then ae.Exit is called.
-func RunGroupAndExit(svcs []Service, opts ...Option) {
-	RunGroupAndExitC(svcs, context.Background(), opts...)
+	RunAndExitC(svc, context.Background(), opts...)
 }
 
 // RunAndExitC starts the service in a given context and forcibly
 // exits the process if the service returns error other than context.Canceled.
 // Used for robust always-on daemons; prints errors and performs ae.Exit.
 func RunAndExitC(svc Service, ctx context.Context, opts ...Option) {
-	RunGroupAndExitC([]Service{svc}, ctx, opts...)
-}
-
-// RunGroupAndExitC starts the service in a given context and forcibly
-// exits the process if the service returns error other than context.Canceled.
-// Used for robust always-on daemons; prints errors and performs ae.Exit.
-func RunGroupAndExitC(svcs []Service, ctx context.Context, opts ...Option) {
-	if err := RunGroupC(svcs, ctx, opts...); err != nil {
+	if err := RunC(svc, ctx, opts...); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			ae.Print(err, ae.PrintFrameFilters(func(frame *ae.StackFrame) bool {
 				return !strings.HasPrefix(frame.Func, "go.aledante.io/as.")
@@ -64,20 +42,29 @@ func RunGroupAndExitC(svcs []Service, ctx context.Context, opts ...Option) {
 // RunC starts the service in the provided context with the given options.
 // Returns when the service exits, with any final error.
 func RunC(svc Service, ctx context.Context, opts ...Option) error {
-	return RunGroupC([]Service{svc}, ctx, opts...)
-}
-
-// RunGroupC starts the service in the provided context with the given options.
-// Returns when the service exits, with any final error.
-func RunGroupC(svcs []Service, ctx context.Context, opts ...Option) error {
-	if len(svcs) == 0 {
-		return nil
-	}
-
-	if err := validateServices(svcs); err != nil {
+	if err := validateService(svc); err != nil {
 		return err
 	}
 
+	options := applyOptions(svc.Name(), svc.Namespace(), opts)
+
+	// Add error attributes to the context
+	ctx = ae.WithOtelAttribute(ctx,
+		semconv.ServiceNameKey.String(svc.Name()),
+		semconv.ServiceVersionKey.String(svc.Version()),
+		semconv.ServiceNamespaceKey.String(svc.Namespace()),
+	)
+
+	// Add service attributes to the context
+	ctx = withName(ctx, svc.Name())
+	ctx = withVersion(ctx, svc.Version())
+	ctx = withNamespace(ctx, svc.Namespace())
+	ctx = withEnvPrefix(ctx, options.EnvPrefix)
+
+	// Create initial logger
+	ctx = WithLogger(ctx, initLogger(ctx, options))
+
+	// Initialize OTEL
 	ctx, otelShutdown, err := initOtel(ctx)
 	if err != nil {
 		return ae.Wrap("OTEL initialization failed", err)
@@ -93,44 +80,17 @@ func RunGroupC(svcs []Service, ctx context.Context, opts ...Option) error {
 		}()
 	}
 
-	errGroup, ctx := errgroup.WithContext(ctx)
-	for _, svc := range svcs {
-		errGroup.Go(func() error {
-			return runLoop(svc, ctx, applyOptions(svc.Name(), svc.Namespace(), opts))
-		})
-	}
-
-	return errGroup.Wait()
+	return runLoop(svc, ctx, options)
 }
 
-func validateServices(svcs []Service) error {
+func validateService(svc Service) error {
 	var errs []error
 
-	type identity struct {
-		name, namespace string
+	if svc.Name() == "" {
+		errs = append(errs, errors.New("service name cannot be empty"))
 	}
-	identities := make(map[identity]struct{})
-
-	for _, svc := range svcs {
-		ident := identity{svc.Name(), svc.Namespace()}
-		if _, ok := identities[ident]; ok {
-			errs = append(errs, ae.New().Attr("name", svc.Name()).
-				Attr("namespace", svc.Namespace()).
-				Msg("duplicate service identity"))
-			continue
-		}
-		identities[ident] = struct{}{}
-
-		if svc.Name() == "" {
-			errs = append(errs, errors.New("service name cannot be empty"))
-		}
-		if svc.Namespace() == "" {
-			errs = append(errs, errors.New("service namespace cannot be empty"))
-		}
-	}
-
-	if len(svcs) > 1 {
-		return ae.WrapMany("invalid service group", errs...)
+	if svc.Namespace() == "" {
+		errs = append(errs, errors.New("service namespace cannot be empty"))
 	}
 
 	return ae.WrapMany("invalid service", errs...)
@@ -139,22 +99,6 @@ func validateServices(svcs []Service) error {
 // runLoop is the internal orchestration entry point. It handles logger creation,
 // tracks running state, and enforces debug level, and supervises the lifecycle loop.
 func runLoop(svc Service, ctx context.Context, opts Options) error {
-	// Add error attributes to the context
-	ctx = ae.WithOtelAttribute(ctx,
-		semconv.ServiceNameKey.String(svc.Name()),
-		semconv.ServiceVersionKey.String(svc.Version()),
-		semconv.ServiceNamespaceKey.String(svc.Namespace()),
-	)
-
-	// Add service attributes to the context
-	ctx = withName(ctx, svc.Name())
-	ctx = withVersion(ctx, svc.Version())
-	ctx = withNamespace(ctx, svc.Namespace())
-	ctx = withEnvPrefix(ctx, opts.EnvPrefix)
-
-	// Create initial logger
-	ctx = WithLogger(ctx, initLogger(ctx, opts))
-
 	graceStart := time.Now()
 	graceCount := 0
 
