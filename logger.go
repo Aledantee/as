@@ -22,8 +22,10 @@ func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
 		if ok {
 			return ctx
 		}
+
 		return context.WithValue(ctx, loggerKey{}, slog.Default())
 	}
+
 	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
@@ -41,6 +43,18 @@ func Logger(ctx context.Context) *slog.Logger {
 
 func initLogger(ctx context.Context, opts Options) *slog.Logger {
 	level := slog.LevelInfo
+
+	switch opts.LogLevel {
+	case "error":
+		level = slog.LevelError
+	case "warn":
+		level = slog.LevelWarn
+	case "debug":
+		level = slog.LevelDebug
+	default:
+		level = slog.LevelInfo
+	}
+
 	if opts.LogDebug {
 		level = slog.LevelDebug
 	}

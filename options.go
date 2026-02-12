@@ -43,7 +43,13 @@ type Options struct {
 	// LogDebug enables verbose debug logging for this service.
 	// Defaults to true when the source tree has local modifications.
 	// Implicitly disables JSON logging when enabled.
+	// Implicitly sets the log level to debug, ignoring any other log level settings.
 	LogDebug bool `env:"LOG_DEBUG"`
+	// LogLevel is the level of logging to use.
+	// Valid values are: debug, info, warn, error, fatal, panic
+	// Invalid values will be ignored and the default will be used.
+	// Defaults to "info"
+	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 	// LogJson enables JSON-formatted logging output.
 	LogJson bool `env:"LOG_JSON"`
 	// LogColors enables colorized logging output. Does nothing when using JSON logging.

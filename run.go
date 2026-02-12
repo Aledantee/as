@@ -48,7 +48,7 @@ func RunC(svc Service, ctx context.Context, opts ...Option) error {
 
 	options := applyOptions(svc.Name(), svc.Namespace(), opts)
 
-	// Add error attributes to the context
+	// Add error attributes to the contextÏ
 	ctx = ae.WithOtelAttribute(ctx,
 		semconv.ServiceNameKey.String(svc.Name()),
 		semconv.ServiceVersionKey.String(svc.Version()),
