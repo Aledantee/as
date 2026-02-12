@@ -3,6 +3,8 @@ package as
 import (
 	"context"
 	"errors"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -11,21 +13,22 @@ import (
 )
 
 // Run starts the service in a new background context with the given options.
+// The context is cancelled on SIGINT or SIGKILL so the service can shut down gracefully.
 // Blocks until the service exits. Returns any error encountered during execution
 // or initialization. Convenience wrapper for RunC.
 func Run(svc Service, opts ...Option) error {
 	return RunC(svc, context.Background(), opts...)
 }
 
-// RunAndExit starts the service in a background context and forcibly
-// exits the process if the service exits with an error other than context.Canceled.
-// Intended for main-functions. Errors are reported, then ae.Exit is called.
+// RunAndExit starts the service in a background context. The context is cancelled
+// on SIGINT or SIGKILL for graceful shutdown. Exits the process only if the service
+// returns an error other than context.Canceled. Intended for main; errors are reported, then ae.Exit is called.
 func RunAndExit(svc Service, opts ...Option) {
 	RunAndExitC(svc, context.Background(), opts...)
 }
 
-// RunAndExitC starts the service in a given context and forcibly
-// exits the process if the service returns error other than context.Canceled.
+// RunAndExitC starts the service; the run context is cancelled on SIGINT or SIGKILL.
+// Exits the process only if the service returns an error other than context.Canceled.
 // Used for robust always-on daemons; prints errors and performs ae.Exit.
 func RunAndExitC(svc Service, ctx context.Context, opts ...Option) {
 	if err := RunC(svc, ctx, opts...); err != nil {
@@ -39,9 +42,13 @@ func RunAndExitC(svc Service, ctx context.Context, opts ...Option) {
 	}
 }
 
-// RunC starts the service in the provided context with the given options.
+// RunC starts the service with the given options. The run context is cancelled
+// when the process receives SIGINT or SIGKILL, so Run can return and Close runs for cleanup.
 // Returns when the service exits, with any final error.
 func RunC(svc Service, ctx context.Context, opts ...Option) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Kill, os.Interrupt)
+	defer cancel()
+
 	if err := validateService(svc); err != nil {
 		return ae.New().
 			Fatal().
