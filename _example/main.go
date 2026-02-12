@@ -41,6 +41,7 @@ func (s *service) Init(ctx context.Context) error {
 }
 
 // Run is the main event loop. It should block until shutdown or error.
+// The context is cancelled on SIGINT/SIGKILL; typically block with <-ctx.Done() and return ctx.Err().
 // Returning an error (other than context.Canceled) stops the service and may trigger exit/restart.
 // This should be idempotent and tolerant of being run multiple times.
 func (s *service) Run(ctx context.Context) error {
