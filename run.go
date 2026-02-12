@@ -43,7 +43,10 @@ func RunAndExitC(svc Service, ctx context.Context, opts ...Option) {
 // Returns when the service exits, with any final error.
 func RunC(svc Service, ctx context.Context, opts ...Option) error {
 	if err := validateService(svc); err != nil {
-		return err
+		return ae.New().
+			Fatal().
+			Cause(err).
+			Msg("invalid service")
 	}
 
 	options := applyOptions(svc.Name(), svc.Namespace(), opts)
@@ -67,7 +70,10 @@ func RunC(svc Service, ctx context.Context, opts ...Option) error {
 	// Initialize OTEL
 	ctx, otelShutdown, err := initOtel(ctx)
 	if err != nil {
-		return ae.Wrap("OTEL initialization failed", err)
+		return ae.New().
+			Fatal().
+			Cause(err).
+			Msg("failed to initialize OTEL")
 	}
 	if otelShutdown != nil {
 		defer func() {
@@ -103,12 +109,12 @@ func runLoop(svc Service, ctx context.Context, opts Options) error {
 	graceCount := 0
 
 	for {
-		err, isInternal, isPanic := runOnce(svc, ctx, opts)
+		err, isPanic := runOnce(svc, ctx, opts)
 		if err == nil {
 			return nil
 		}
 
-		if isInternal || !opts.RestartOnError {
+		if !opts.RestartOnError || !ae.IsRecoverable(err) {
 			return err
 		}
 
@@ -162,7 +168,7 @@ func runLoop(svc Service, ctx context.Context, opts Options) error {
 	}
 }
 
-func runOnce(svc Service, ctx context.Context, opts Options) (err error, isInternal bool, isPanic bool) {
+func runOnce(svc Service, ctx context.Context, opts Options) (err error, isPanic bool) {
 	if opts.RecoverPanic {
 		defer func() {
 			if cause := recover(); cause != nil {
@@ -186,14 +192,14 @@ func runOnce(svc Service, ctx context.Context, opts Options) (err error, isInter
 
 	Logger(ctx).Debug("initializing service")
 	if err := svc.Init(ctx); err != nil {
-		return ae.Wrap("service initialization failed", err), false, false
+		return ae.Wrap("service initialization failed", err), false
 	}
 
 	Logger(ctx).Debug("starting service")
 	if err = svc.Run(ctx); err != nil {
 		// Do not handle context.Canceled errors here, since they are expected and we should clean up on cancellation
 		if !errors.Is(err, context.Canceled) {
-			return ae.Wrap("service run failed", err), true, false
+			return ae.Wrap("service run failed", err), false
 		}
 	}
 
@@ -204,5 +210,5 @@ func runOnce(svc Service, ctx context.Context, opts Options) (err error, isInter
 		Logger(ctx).Error("service shutdown failed", "error", err)
 	}
 
-	return nil, false, false
+	return nil, false
 }
