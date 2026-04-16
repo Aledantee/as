@@ -82,12 +82,14 @@ func DefaultOptions() Options {
 		GracePeriod:         1 * time.Minute,
 		GraceCount:          3,
 		ShutdownTimeout:     30 * time.Second,
-		LogDebug:            false,
-		LogColors:           false,
-		LogAutoColors:       true,
-		LogJson:             true,
-		EnvPrefix:           "",
-		DisableEnvPrefix:    false,
+		// Per LogDebug docstring: "Defaults to true when the source tree has
+		// local modifications."
+		LogDebug:         vcsModified(),
+		LogColors:        false,
+		LogAutoColors:    true,
+		LogJson:          true,
+		EnvPrefix:        "",
+		DisableEnvPrefix: false,
 	}
 }
 

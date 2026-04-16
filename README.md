@@ -6,7 +6,7 @@
 
 - **Service interface** — `Name()`, `Namespace()`, `Version()`, `Init(ctx)`, `Run(ctx)`, `Close(ctx)`
 - **Single or group** — Run one service with `Run` / `RunAndExit`, or multiple with `RunGroup` / `RunGroupAndExit`
-- **Signal-based cancellation** — Context is cancelled on SIGINT and SIGKILL so services can shut down gracefully; `Close` is invoked and `context.Canceled` is not treated as a fatal error in `RunAndExit`.
+- **Signal-based cancellation** — Context is cancelled on SIGINT and SIGTERM so services can shut down gracefully; `Close` is invoked and `context.Canceled` is not treated as a fatal error in `RunAndExit`.
 - **Supervision** — Optional restart on error or panic with configurable grace period and count
 - **Structured logging** — `slog`-based logger in context (JSON or tint-colored), with service name, version, and namespace
 - **OpenTelemetry** — Traces and metrics via autoexport; service attributes attached to context
@@ -77,7 +77,7 @@ func main() {
 ## Service lifecycle
 
 1. **Validate** — Each service must have non-empty `Name()` and `Namespace()`. In a group, (name, namespace) must be unique.
-2. **Signals** — The run context is cancelled when the process receives SIGINT or SIGKILL, so `Run(ctx)` can return `ctx.Err()` and `Close(ctx)` runs for cleanup.
+2. **Signals** — The run context is cancelled when the process receives SIGINT or SIGTERM, so `Run(ctx)` can return `ctx.Err()` and `Close(ctx)` runs for cleanup.
 3. **Loop** — On each iteration (including after a restart), the service runs:
    - **Init** — OpenTelemetry is initialized, then `Init(ctx)` is called. On error, the iteration fails (and may trigger a restart if configured).
    - **Run** — `Run(ctx)` is executed. It should block until the context is canceled or an error occurs (e.g. `<-ctx.Done(); return ctx.Err()`).
@@ -145,10 +145,10 @@ The context passed to `Init`, `Run`, and `Close` carries:
 
 ## Running the service
 
-Run contexts are cancelled when the process receives **SIGINT** or **SIGKILL**, so services can block on `<-ctx.Done()` and return `ctx.Err()` for graceful shutdown; `Close(ctx)` is then invoked.
+Run contexts are cancelled when the process receives **SIGINT** or **SIGTERM**, so services can block on `<-ctx.Done()` and return `ctx.Err()` for graceful shutdown; `Close(ctx)` is then invoked.
 
 - **`Run(svc, opts...)`** — Runs a single service until it exits or a signal is received; blocks and returns the final error.
-- **`RunC(svc, ctx, opts...)`** — Same as `Run`; the run context is still cancelled by signal (SIGINT/SIGKILL).
+- **`RunC(svc, ctx, opts...)`** — Same as `Run`; the run context is still cancelled by signal (SIGINT/SIGTERM).
 - **`RunGroup(svcs, opts...)`** / **`RunGroupC(svcs, ctx, opts...)`** — Run multiple services in an errgroup; all share the same context and options; returns when the first fails or context is canceled.
 - **`RunAndExit(svc, opts...)`** / **`RunAndExitC(svc, ctx, opts...)`** — Run one service and, if it exits with an error other than `context.Canceled`, print the error and call `ae.Exit(err)`. Exit on signal is treated as success (no exit). Intended for `main()` of always-on daemons.
 - **`RunGroupAndExit(svcs, opts...)`** / **`RunGroupAndExitC(svcs, ctx, opts...)`** — Same for a group of services.
