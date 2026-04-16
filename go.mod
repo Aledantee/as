@@ -1,13 +1,13 @@
 module go.aledante.io/as
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/fatih/color v1.19.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.21
-	go.aledante.io/ae v0.2.1
+	go.aledante.io/ae v0.3.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.68.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.68.0
 	go.opentelemetry.io/otel v1.43.0

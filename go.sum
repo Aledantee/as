@@ -54,8 +54,8 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-go.aledante.io/ae v0.2.1 h1:LD1RshiFN0nDU/81ubIUJQOhuyCRMzAlK6QA2lycOUs=
-go.aledante.io/ae v0.2.1/go.mod h1:QMHHUIwYLHVAftbM0VcRZe02cJIBtEr7/csSzrZ/ElU=
+go.aledante.io/ae v0.3.0 h1:ssUL8W7uQK+rap3MDh5IjiyS3cqnhLA1c0NLQwp84l8=
+go.aledante.io/ae v0.3.0/go.mod h1:CYLwcYoG5Ihy6eUpjLrcpnuMxJtNGefR7WPISsYeppI=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/contrib/bridges/prometheus v0.68.0 h1:w3zlHYETbDwXyWHZlyyR58ZC39XGi8rAhkBgUgJ9d5w=
