@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// Service defines the interface for an service implementation.
+// Service defines the interface for a service implementation.
 type Service interface {
 	// Name returns the service name.
 	Name() string

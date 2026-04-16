@@ -99,7 +99,7 @@ Use `as.DefaultOptions()` or pass `as.Option` funcs into `Run`, `RunC`, `RunGrou
 | `GracePeriod` | Max time after first start during which restarts are allowed |
 | `GraceCount` | Max number of restarts after the first start |
 | `ShutdownTimeout` | Max time to wait for shutdown |
-| `LogDebug` | Enable debug-level logging |
+| `LogDebug` | Enable debug-level logging. Defaults to `true` when the binary was built from a working tree with local modifications (via `runtime/debug` build info), otherwise `false`. When on, implicitly forces text (non-JSON) output. |
 | `LogJson` | Use JSON logging |
 | `LogColors` / `LogAutoColors` | Colorized output (auto: when stdout is a TTY) |
 | `EnvPrefix` | Prefix for option env vars. If empty, defaults to `<namespace>_<name>_` (namespace omitted if empty); the prefix is normalized via NormalizeEnvKey. Options are then loaded from env (e.g. `PREFIX_RESTART_ON_ERROR`, `PREFIX_GRACE_PERIOD`). |
@@ -149,6 +149,6 @@ Run contexts are cancelled when the process receives **SIGINT** or **SIGTERM**, 
 
 - **`Run(svc, opts...)`** — Runs a single service until it exits or a signal is received; blocks and returns the final error.
 - **`RunC(svc, ctx, opts...)`** — Same as `Run`; the run context is still cancelled by signal (SIGINT/SIGTERM).
-- **`RunGroup(svcs, opts...)`** / **`RunGroupC(svcs, ctx, opts...)`** — Run multiple services in an errgroup; all share the same context and options; returns when the first fails or context is canceled.
+- **`RunGroup(svcs, opts...)`** / **`RunGroupC(svcs, ctx, opts...)`** — Run multiple services concurrently with a shared ctx and options. When any service exits with an error the shared ctx is cancelled so peers can shut down; `RunGroup` then blocks until every service has exited and returns the combined error (or nil if all exited cleanly). (name, namespace) pairs must be unique within the group.
 - **`RunAndExit(svc, opts...)`** / **`RunAndExitC(svc, ctx, opts...)`** — Run one service and, if it exits with an error other than `context.Canceled`, print the error and call `ae.Exit(err)`. Exit on signal is treated as success (no exit). Intended for `main()` of always-on daemons.
 - **`RunGroupAndExit(svcs, opts...)`** / **`RunGroupAndExitC(svcs, ctx, opts...)`** — Same for a group of services.

@@ -36,9 +36,13 @@ type Options struct {
 	// GraceCount is the total number of allowed restarts after the first start.
 	// If set to zero, there is no limit.
 	GraceCount int `env:"GRACE_COUNT"`
-	// ShutdownTimeout is the maximum duration to wait when shutting down the service gracefully.
-	// If the service shutdown takes longer than this, it will be forcefully terminated. Any restart config
-	// will be ignored.
+	// ShutdownTimeout bounds graceful shutdown. When set, the context passed
+	// to Close (and to OTEL shutdown) carries a matching deadline that is
+	// detached from the parent's cancellation, so a cooperative Close can
+	// honour it via <-ctx.Done() even after the service was cancelled by a
+	// signal. A Close that ignores the deadline will still block until it
+	// returns. When set to zero no deadline is applied (cleanup may block
+	// indefinitely).
 	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT"`
 	// LogDebug enables verbose debug logging for this service.
 	// Defaults to true when the source tree has local modifications.
