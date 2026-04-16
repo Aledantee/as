@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	github.com/caarlos0/env/v11 v11.4.0
+	github.com/fatih/color v1.19.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.21
 	go.aledante.io/ae v0.2.1
@@ -22,7 +23,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/fatih/color v1.19.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
