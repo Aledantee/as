@@ -19,7 +19,7 @@
 go get go.aledante.io/as
 ```
 
-Requires Go 1.25.6 or later.
+Requires Go 1.26 or later.
 
 ## Quick example
 
