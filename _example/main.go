@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"go.aledante.io/ae"
 	"go.aledante.io/as"
 )
 
@@ -34,10 +35,11 @@ func (s *service) Version() string {
 // Init runs once before Run. Use it to load config, open connections, or validate env.
 // This should be idempotent and tolerant of being run multiple times.
 func (s *service) Init(ctx context.Context) error {
-	logger := as.Logger(ctx)
+	err := ae.New().
+		Cause(ae.Msg("some inner failure")).
+		Msg("some failure")
 
-	logger.Info("env prefix", "prefix", as.EnvPrefix(ctx))
-	return nil
+	return err
 }
 
 // Run is the main event loop. It should block until shutdown or error.
