@@ -118,6 +118,8 @@ func withTextMapPropagator(ctx context.Context, propagator propagation.TextMapPr
 	return context.WithValue(ctx, textMapPropagatorKey{}, propagator)
 }
 
+// TextMapPropagator extracts the propagation.TextMapPropagator from the
+// context, or returns a new empty composite propagator if none is set.
 func TextMapPropagator(ctx context.Context) propagation.TextMapPropagator {
 	v, ok := ctx.Value(textMapPropagatorKey{}).(propagation.TextMapPropagator)
 	if !ok {
@@ -127,8 +129,13 @@ func TextMapPropagator(ctx context.Context) propagation.TextMapPropagator {
 	return v
 }
 
-// initOtel initializes OpenTelemetry providers or resources for the given context.
-// This currently panics as it is not implemented.
+// initOtel initializes OpenTelemetry providers for the given context. It
+// configures a W3C TraceContext propagator, a tracer provider with an
+// autoexport span exporter, a meter provider with an autoexport metric
+// reader, and starts runtime metrics collection. When no OTEL exporter
+// environment variables are set it falls back to no-op implementations and
+// logs a warning. Returns the enriched context and a shutdown func that
+// flushes the exporter/reader.
 func initOtel(ctx context.Context) (context.Context, func(context.Context) error, error) {
 	var shutdownFuncs []func(context.Context) error
 	shutdown := func(shutdownCtx context.Context) error {

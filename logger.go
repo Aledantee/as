@@ -41,6 +41,14 @@ func Logger(ctx context.Context) *slog.Logger {
 	return v
 }
 
+// Custom slog levels for the two non-standard names documented by
+// Options.LogLevel ("fatal", "panic"). slog does not define these, so we
+// position them above LevelError at the conventional offsets (+4 / +8).
+const (
+	levelFatal = slog.LevelError + 4
+	levelPanic = slog.LevelError + 8
+)
+
 func initLogger(ctx context.Context, opts Options) *slog.Logger {
 	level := slog.LevelInfo
 
@@ -51,18 +59,19 @@ func initLogger(ctx context.Context, opts Options) *slog.Logger {
 		level = slog.LevelWarn
 	case "debug":
 		level = slog.LevelDebug
+	case "fatal":
+		level = levelFatal
+	case "panic":
+		level = levelPanic
 	default:
 		level = slog.LevelInfo
 	}
 
 	if opts.LogDebug {
 		level = slog.LevelDebug
-	}
-
-	if opts.LogAutoColors || opts.LogDebug {
-		if isatty.IsTerminal(os.Stdout.Fd()) {
-			opts.LogColors = true
-		}
+		// Per Options.LogDebug docstring: "Implicitly disables JSON logging
+		// when enabled."
+		opts.LogJson = false
 	}
 
 	var handler slog.Handler
@@ -70,16 +79,14 @@ func initLogger(ctx context.Context, opts Options) *slog.Logger {
 		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: level,
 		})
+	} else if effectiveLogColors(opts) {
+		handler = tint.NewHandler(os.Stdout, &tint.Options{
+			Level: level,
+		})
 	} else {
-		if opts.LogColors {
-			handler = tint.NewHandler(os.Stdout, &tint.Options{
-				Level: level,
-			})
-		} else {
-			handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-				Level: level,
-			})
-		}
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: level,
+		})
 	}
 
 	logger := slog.New(handler)
@@ -95,4 +102,17 @@ func initLogger(ctx context.Context, opts Options) *slog.Logger {
 	}
 
 	return logger
+}
+
+// effectiveLogColors reports whether colored output should be used for the
+// given options. Colors are enabled when LogColors is set explicitly, or
+// when LogAutoColors / LogDebug is set and stdout is a terminal.
+func effectiveLogColors(opts Options) bool {
+	if opts.LogColors {
+		return true
+	}
+	if opts.LogAutoColors || opts.LogDebug {
+		return isatty.IsTerminal(os.Stdout.Fd())
+	}
+	return false
 }
