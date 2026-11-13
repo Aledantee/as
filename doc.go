@@ -22,6 +22,10 @@
 // (TracerProvider, MeterProvider, Tracer, Meter, TextMapPropagator), and
 // typed-config helpers (GetEnv, LookupEnv, LoadEnv).
 //
+// The OpenTelemetry setup can be turned off with WithDisableOtel (env
+// PREFIX_OTEL_DISABLED) or the standard OTEL_SDK_DISABLED=true. The
+// OpenTelemetry accessors then return no-op implementations.
+//
 // # Options and environment
 //
 // Options are applied via Option func helpers (WithRestartOnError,

@@ -9,7 +9,7 @@
 - **Signal-based cancellation** — Context is cancelled on SIGINT and SIGTERM so services can shut down gracefully; `Close` is invoked and `context.Canceled` is not treated as a fatal error in `RunAndExit`.
 - **Supervision** — Optional restart on error or panic with configurable grace period and count
 - **Structured logging** — `slog`-based logger in context (JSON or tint-colored), with service name, version, and namespace
-- **OpenTelemetry** — Traces and metrics via autoexport; service attributes attached to context
+- **OpenTelemetry** — Traces and metrics via autoexport; service attributes attached to context. Can be turned off with `DisableOtel` or `OTEL_SDK_DISABLED=true`.
 - **Environment config** — Prefixed env vars and `LoadEnv[T]` for typed config from context; env key normalization for POSIX-safe names
 - **Context utilities** — `Name`, `Namespace`, `Version`, `Logger`, `Tracer`, `Meter`, `EnvPrefix`, `GetEnv`, `LookupEnv`, `LoadEnv[T]` from context
 
@@ -79,7 +79,7 @@ func main() {
 1. **Validate** — Each service must have non-empty `Name()` and `Namespace()`. In a group, (name, namespace) must be unique.
 2. **Signals** — The run context is cancelled when the process receives SIGINT or SIGTERM, so `Run(ctx)` can return `ctx.Err()` and `Close(ctx)` runs for cleanup.
 3. **Loop** — On each iteration (including after a restart), the service runs:
-   - **Init** — OpenTelemetry is initialized, then `Init(ctx)` is called. On error, the iteration fails (and may trigger a restart if configured).
+   - **Init** — OpenTelemetry is initialized (unless disabled, see `DisableOtel`), then `Init(ctx)` is called. On error, the iteration fails (and may trigger a restart if configured).
    - **Run** — `Run(ctx)` is executed. It should block until the context is canceled or an error occurs (e.g. `<-ctx.Done(); return ctx.Err()`).
    - **Close** — `Close(ctx)` is called, then OpenTelemetry is shut down. Close errors are logged but do not change the process exit behavior.
 
@@ -99,6 +99,7 @@ Use `as.DefaultOptions()` or pass `as.Option` funcs into `Run`, `RunC`, `RunGrou
 | `GracePeriod` | Max time after first start during which restarts are allowed |
 | `GraceCount` | Max number of restarts after the first start |
 | `ShutdownTimeout` | Max time to wait for shutdown |
+| `DisableOtel` | Turn off the OpenTelemetry setup (`WithDisableOtel(true)`): no exporters, no runtime metrics, no "no-op OTEL exporter" warnings and no OTEL shutdown. `Tracer`, `Meter`, `TracerProvider`, `MeterProvider` and `TextMapPropagator` return no-op implementations. The standard `OTEL_SDK_DISABLED=true` (unprefixed, case-insensitive) has the same effect. Defaults to `false`. |
 | `LogDebug` | Enable debug-level logging. Defaults to `true` when the binary was built from a working tree with local modifications (via `runtime/debug` build info), otherwise `false`. When on, implicitly forces text (non-JSON) output. |
 | `LogJson` | Use JSON logging |
 | `LogColors` / `LogAutoColors` | Colorized output (auto: when stdout is a TTY) |
@@ -119,6 +120,7 @@ Options (restart, logging, shutdown, etc.) are merged with the environment after
 | `GRACE_PERIOD` | Max time after first start during which restarts are allowed (e.g. `1m`) |
 | `GRACE_COUNT` | Max number of restarts after the first start |
 | `SHUTDOWN_TIMEOUT` | Max time to wait for shutdown (e.g. `30s`) |
+| `OTEL_DISABLED` | Turn off the OpenTelemetry setup (e.g. `PREFIX_OTEL_DISABLED=true`) |
 | `LOG_DEBUG` | Enable debug-level logging |
 | `LOG_JSON` | Use JSON logging |
 | `LOG_COLORS` | Force colorized output |
@@ -141,7 +143,7 @@ The context passed to `Init`, `Run`, and `Close` carries:
 - **Identity** — `as.Name(ctx)`, `as.Namespace(ctx)`, `as.Version(ctx)`
 - **Logging** — `as.Logger(ctx)` returns an `*slog.Logger` with service metadata
 - **Environment** — The env prefix (from `EnvPrefix` or default `<namespace>_<name>_`, normalized) is set in context. Use `as.GetEnv(ctx, key)`, `as.LookupEnv(ctx, key)`, `as.LoadEnv[T](ctx)`.
-- **OpenTelemetry** — `as.Tracer(ctx)`, `as.Meter(ctx)` for tracing and metrics
+- **OpenTelemetry** — `as.Tracer(ctx)`, `as.Meter(ctx)` for tracing and metrics (`as.TracerProvider`, `as.MeterProvider` and `as.TextMapPropagator` are also available). With OpenTelemetry disabled they return no-op implementations, so spans and instruments can still be created.
 
 ## Running the service
 

@@ -40,6 +40,24 @@ func TestApplyOptions_EnvOverridesOptionHelpers(t *testing.T) {
 	}
 }
 
+func TestApplyOptions_DisableOtelFromPrefixedEnv(t *testing.T) {
+	t.Setenv("NS_SVC_OTEL_DISABLED", "true")
+
+	got := applyOptions("svc", "ns", nil)
+	if !got.DisableOtel {
+		t.Error("DisableOtel = false, want true (from NS_SVC_OTEL_DISABLED)")
+	}
+}
+
+func TestApplyOptions_DisableOtelEnvOverridesOptionHelper(t *testing.T) {
+	t.Setenv("NS_SVC_OTEL_DISABLED", "false")
+
+	got := applyOptions("svc", "ns", []Option{WithDisableOtel(true)})
+	if got.DisableOtel {
+		t.Error("DisableOtel = true, want false (env must override option helper)")
+	}
+}
+
 func TestApplyOptions_DefaultPrefix(t *testing.T) {
 	got := applyOptions("svc", "ns", nil)
 	if got.EnvPrefix != "NS_SVC_" {

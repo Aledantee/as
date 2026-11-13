@@ -44,6 +44,16 @@ type Options struct {
 	// returns. When set to zero no deadline is applied (cleanup may block
 	// indefinitely).
 	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT"`
+	// DisableOtel turns off the OpenTelemetry setup entirely: no resource,
+	// propagator, exporters or runtime metrics are created, no "no-op OTEL
+	// exporter" warnings are logged, and there is no OTEL shutdown. The
+	// context accessors (TracerProvider, Tracer, MeterProvider, Meter,
+	// TextMapPropagator) keep working and return no-op implementations, so
+	// services that create spans and instruments run unchanged.
+	// Setting the standard OpenTelemetry variable OTEL_SDK_DISABLED=true
+	// (unprefixed, case-insensitive) has the same effect.
+	// Defaults to false.
+	DisableOtel bool `env:"OTEL_DISABLED"`
 	// LogDebug enables verbose debug logging for this service.
 	// Defaults to true when the source tree has local modifications.
 	// Implicitly disables JSON logging when enabled.
@@ -86,6 +96,7 @@ func DefaultOptions() Options {
 		GracePeriod:         1 * time.Minute,
 		GraceCount:          3,
 		ShutdownTimeout:     30 * time.Second,
+		DisableOtel:         false,
 		// Per LogDebug docstring: "Defaults to true when the source tree has
 		// local modifications."
 		LogDebug:         vcsModified(),
@@ -139,6 +150,12 @@ func WithGraceCount(v int) Option {
 // WithShutdownTimeout sets the maximum time to wait for graceful service shutdown.
 func WithShutdownTimeout(v time.Duration) Option {
 	return func(o *Options) { o.ShutdownTimeout = v }
+}
+
+// WithDisableOtel sets the DisableOtel field, turning the OpenTelemetry setup off or on.
+// When disabled, the context accessors return no-op providers.
+func WithDisableOtel(v bool) Option {
+	return func(o *Options) { o.DisableOtel = v }
 }
 
 // WithLogDebug sets the LogDebug field, enabling or disabling verbose debug logging.

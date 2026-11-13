@@ -103,6 +103,12 @@ func runService(svc Service, ctx context.Context, opts ...Option) error {
 
 	ctx = WithLogger(ctx, initLogger(ctx, options))
 
+	if otelDisabled(options) {
+		ctx = withNoopOtel(ctx)
+		Logger(ctx).Debug("OpenTelemetry disabled")
+		return runLoop(svc, ctx, options)
+	}
+
 	ctx, otelShutdown, err := initOtel(ctx)
 	if err != nil {
 		return ae.New().

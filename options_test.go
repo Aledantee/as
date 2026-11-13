@@ -24,6 +24,7 @@ func TestDefaultOptions(t *testing.T) {
 		GracePeriod:         1 * time.Minute,
 		GraceCount:          3,
 		ShutdownTimeout:     30 * time.Second,
+		DisableOtel:         false,
 		LogJson:             true,
 		LogColors:           false,
 		LogAutoColors:       true,
@@ -54,6 +55,9 @@ func TestDefaultOptions(t *testing.T) {
 	}
 	if got.ShutdownTimeout != want.ShutdownTimeout {
 		t.Errorf("ShutdownTimeout = %v, want %v", got.ShutdownTimeout, want.ShutdownTimeout)
+	}
+	if got.DisableOtel != want.DisableOtel {
+		t.Errorf("DisableOtel = %v, want %v", got.DisableOtel, want.DisableOtel)
 	}
 	if got.LogJson != want.LogJson {
 		t.Errorf("LogJson = %v, want %v", got.LogJson, want.LogJson)
@@ -91,9 +95,11 @@ func TestWithOptionHelpers(t *testing.T) {
 			verify: func(t *testing.T, o as.Options) { mustEqual(t, "RestartOnError", o.RestartOnError, false) },
 		},
 		{
-			name:   "WithRestartOnErrorDelay",
-			apply:  as.WithRestartOnErrorDelay(7 * time.Second),
-			verify: func(t *testing.T, o as.Options) { mustEqual(t, "RestartOnErrorDelay", o.RestartOnErrorDelay, 7*time.Second) },
+			name:  "WithRestartOnErrorDelay",
+			apply: as.WithRestartOnErrorDelay(7 * time.Second),
+			verify: func(t *testing.T, o as.Options) {
+				mustEqual(t, "RestartOnErrorDelay", o.RestartOnErrorDelay, 7*time.Second)
+			},
 		},
 		{
 			name:   "WithRestartOnPanic",
@@ -101,9 +107,11 @@ func TestWithOptionHelpers(t *testing.T) {
 			verify: func(t *testing.T, o as.Options) { mustEqual(t, "RestartOnPanic", o.RestartOnPanic, true) },
 		},
 		{
-			name:   "WithRestartOnPanicDelay",
-			apply:  as.WithRestartOnPanicDelay(3 * time.Second),
-			verify: func(t *testing.T, o as.Options) { mustEqual(t, "RestartOnPanicDelay", o.RestartOnPanicDelay, 3*time.Second) },
+			name:  "WithRestartOnPanicDelay",
+			apply: as.WithRestartOnPanicDelay(3 * time.Second),
+			verify: func(t *testing.T, o as.Options) {
+				mustEqual(t, "RestartOnPanicDelay", o.RestartOnPanicDelay, 3*time.Second)
+			},
 		},
 		{
 			name:   "WithRecoverPanic",
@@ -124,6 +132,11 @@ func TestWithOptionHelpers(t *testing.T) {
 			name:   "WithShutdownTimeout",
 			apply:  as.WithShutdownTimeout(15 * time.Second),
 			verify: func(t *testing.T, o as.Options) { mustEqual(t, "ShutdownTimeout", o.ShutdownTimeout, 15*time.Second) },
+		},
+		{
+			name:   "WithDisableOtel",
+			apply:  as.WithDisableOtel(true),
+			verify: func(t *testing.T, o as.Options) { mustEqual(t, "DisableOtel", o.DisableOtel, true) },
 		},
 		{
 			name:   "WithLogDebug",

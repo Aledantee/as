@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	"go.aledante.io/ae"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
@@ -127,6 +129,38 @@ func TextMapPropagator(ctx context.Context) propagation.TextMapPropagator {
 	}
 
 	return v
+}
+
+// otelSdkDisabledEnvKey is the standard OpenTelemetry environment variable
+// that disables the SDK for all signals. The Go SDK does not read it itself,
+// so the library honours it here. It is read without the service env prefix.
+const otelSdkDisabledEnvKey = "OTEL_SDK_DISABLED"
+
+// otelDisabled reports whether the OpenTelemetry setup is turned off, either
+// by Options.DisableOtel or by OTEL_SDK_DISABLED=true. As in the
+// OpenTelemetry specification, only the value "true" (case-insensitive)
+// disables the SDK; any other value is treated as false.
+func otelDisabled(opts Options) bool {
+	if opts.DisableOtel {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(os.Getenv(otelSdkDisabledEnvKey)), "true")
+}
+
+// withNoopOtel stores no-op tracer and meter providers, their default tracer
+// and meter, and an empty composite propagator in ctx. It is used instead of
+// initOtel when OpenTelemetry is disabled, so the accessors return no-op
+// implementations even when ctx already carries providers.
+func withNoopOtel(ctx context.Context) context.Context {
+	tracerProvider := traceNoop.NewTracerProvider()
+	ctx = withTracerProvider(ctx, tracerProvider)
+	ctx = withTracer(ctx, tracerProvider.Tracer(tracerName))
+
+	meterProvider := metricNoop.NewMeterProvider()
+	ctx = withMeterProvider(ctx, meterProvider)
+	ctx = withMeter(ctx, meterProvider.Meter(meterName))
+
+	return withTextMapPropagator(ctx, propagation.NewCompositeTextMapPropagator())
 }
 
 // initOtel initializes OpenTelemetry providers for the given context. It
